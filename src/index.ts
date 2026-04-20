@@ -1,6 +1,6 @@
 // email-worker/src/index.ts - Scans email inbox and forwards signals to trade-worker
 
-import type { Fetcher from "@cloudflare/workers-types";
+import type { Fetcher } from "@cloudflare/workers-types";
 
 interface SecretBinding {
   get: () => Promise<string | null>;

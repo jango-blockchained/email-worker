@@ -19,9 +19,6 @@
       "service": "trade-worker",
     },
   ],
-  "secrets_store": {
-    "bindings": [],
-  },
   "triggers": {
     "crons": ["*/5 * * * *"],
   },
