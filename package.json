@@ -12,7 +12,7 @@
     "imap": "^0.8.19"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250430.0",
-    "wrangler": "^4.0.0"
+    "@cloudflare/workers-types": "^4.20260420.1",
+    "wrangler": "^4.83.0"
   }
 }
