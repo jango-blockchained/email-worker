@@ -22,4 +22,10 @@
   "triggers": {
     "crons": ["*/5 * * * *"],
   },
+  "secrets_store_secrets": [
+    {
+      "name": "MAILGUN_API_KEY",
+      "type": "secret"
+    }
+  ]
 }

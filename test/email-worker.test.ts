@@ -1,10 +1,29 @@
 import { describe, expect, test, beforeEach, jest } from "bun:test";
 
+const TEST_MAILGUN_API_KEY = "test-mailgun-api-key";
+
+async function generateMailgunSignature(timestamp: string, token: string, apiKey: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const dataToSign = timestamp + token;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(apiKey),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(dataToSign));
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 const mockEnvBase = {
   EMAIL_HOST_BINDING: { get: async () => "imap.example.com" },
   EMAIL_USER_BINDING: { get: async () => "user@example.com" },
   EMAIL_PASS_BINDING: { get: async () => "password123" },
   INTERNAL_KEY_BINDING: { get: async () => "internal-key-123" },
+  MAILGUN_API_KEY: { get: async () => TEST_MAILGUN_API_KEY },
   EMAIL_SCAN_SUBJECT: "Trading Signal",
   USE_IMAP: "false"
 };
@@ -64,10 +83,14 @@ describe("email-worker", () => {
     expect((await res.json()).error).toContain("No valid signal");
   });
 
-  test("POST mailgun webhook processes form data", async () => {
+  test("POST mailgun webhook processes form data with valid signature", async () => {
     const mockFetch = jest.fn().mockResolvedValue(
       new Response(JSON.stringify({ requestId: "mg-123" }), { status: 200 })
     );
+
+    const timestamp = "1234567890";
+    const token = "abc123";
+    const signature = await generateMailgunSignature(timestamp, token, TEST_MAILGUN_API_KEY);
 
     const worker = (await import("../src/index.ts")).default;
     const formData = new FormData();
@@ -83,7 +106,10 @@ describe("email-worker", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "Mailgun"
+        "User-Agent": "Mailgun",
+        "Mailgun-Signature": signature,
+        "Mailgun-Timestamp": timestamp,
+        "Mailgun-Token": token
       },
       body: formData
     });
@@ -103,6 +129,10 @@ describe("email-worker", () => {
       new Response(JSON.stringify({ requestId: "mg-456" }), { status: 200 })
     );
 
+    const timestamp = "1234567891";
+    const token = "def456";
+    const signature = await generateMailgunSignature(timestamp, token, TEST_MAILGUN_API_KEY);
+
     const worker = (await import("../src/index.ts")).default;
     const formData = new FormData();
     formData.append("subject", "Signal");
@@ -117,7 +147,10 @@ describe("email-worker", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "Mailgun"
+        "User-Agent": "Mailgun",
+        "Mailgun-Signature": signature,
+        "Mailgun-Timestamp": timestamp,
+        "Mailgun-Token": token
       },
       body: formData
     });
@@ -234,6 +267,76 @@ describe("email-worker", () => {
     });
 
     expect(res.status).toBe(200);
+  });
+});
+
+describe("Mailgun signature validation", () => {
+  test("returns 401 if Mailgun-Signature header is missing", async () => {
+    const worker = (await import("../src/index.ts")).default;
+    const formData = new FormData();
+    formData.append("subject", "Test");
+    formData.append("body-plain", JSON.stringify({ exchange: "binance", action: "buy", symbol: "BTC" }));
+
+    const req = new Request("https://email-worker.workers.dev", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mailgun"
+      },
+      body: formData
+    });
+
+    const res = await worker.fetch(req, { ...mockEnvBase, TRADE_SERVICE: {} as any });
+    expect(res.status).toBe(401);
+  });
+
+  test("returns 401 if Mailgun-Signature header is invalid", async () => {
+    const worker = (await import("../src/index.ts")).default;
+    const formData = new FormData();
+    formData.append("subject", "Test");
+    formData.append("body-plain", JSON.stringify({ exchange: "binance", action: "buy", symbol: "BTC" }));
+
+    const req = new Request("https://email-worker.workers.dev", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mailgun",
+        "Mailgun-Signature": "invalidsignature",
+        "Mailgun-Timestamp": "1234567890",
+        "Mailgun-Token": "abc123"
+      },
+      body: formData
+    });
+
+    const res = await worker.fetch(req, { ...mockEnvBase, TRADE_SERVICE: {} as any });
+    expect(res.status).toBe(401);
+  });
+
+  test("returns 500 if MAILGUN_API_KEY is not configured", async () => {
+    const timestamp = "1234567890";
+    const token = "abc123";
+    const signature = await generateMailgunSignature(timestamp, token, TEST_MAILGUN_API_KEY);
+
+    const worker = (await import("../src/index.ts")).default;
+    const formData = new FormData();
+    formData.append("subject", "Test");
+    formData.append("body-plain", JSON.stringify({ exchange: "binance", action: "buy", symbol: "BTC" }));
+
+    const req = new Request("https://email-worker.workers.dev", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mailgun",
+        "Mailgun-Signature": signature,
+        "Mailgun-Timestamp": timestamp,
+        "Mailgun-Token": token
+      },
+      body: formData
+    });
+
+    const envWithoutKey = { ...mockEnvBase, MAILGUN_API_KEY: undefined };
+    const res = await worker.fetch(req, { ...envWithoutKey, TRADE_SERVICE: {} as any });
+    expect(res.status).toBe(500);
   });
 });
 

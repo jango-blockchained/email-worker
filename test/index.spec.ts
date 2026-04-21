@@ -1,6 +1,22 @@
 import { describe, expect, test, vi } from "bun:test";
 import worker from "../src/index";
 
+async function generateMailgunSignature(timestamp: string, token: string, apiKey: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const dataToSign = timestamp + token;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(apiKey),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(dataToSign));
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 describe("Email Worker fetch handler", () => {
   test("should handle standard GET request with default text response", async () => {
     const req = new Request("http://localhost");
@@ -12,18 +28,30 @@ describe("Email Worker fetch handler", () => {
   });
 
   test("should handle Mailgun webhook payload", async () => {
+    const TEST_KEY = "test-mailgun-key";
+    const timestamp = "1234567890";
+    const token = "abc123";
+    const signature = await generateMailgunSignature(timestamp, token, TEST_KEY);
+
     const params = new URLSearchParams();
     params.append("subject", "Trade");
     params.append("body-plain", '{"exchange":"mexc","action":"long","symbol":"BTC_USDT"}');
-    
+
     const req = new Request("http://localhost", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Mailgun" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mailgun",
+        "Mailgun-Signature": signature,
+        "Mailgun-Timestamp": timestamp,
+        "Mailgun-Token": token
+      },
       body: params.toString()
     });
 
     const mockEnv = {
       INTERNAL_KEY_BINDING: { get: async () => "test-key" },
+      MAILGUN_API_KEY: { get: async () => TEST_KEY },
       TRADE_SERVICE: {
         fetch: vi.fn().mockResolvedValue({
           ok: true,
@@ -41,17 +69,29 @@ describe("Email Worker fetch handler", () => {
   });
 
   test("should handle Mailgun webhook with invalid signal", async () => {
+    const TEST_KEY = "test-mailgun-key";
+    const timestamp = "1234567891";
+    const token = "def456";
+    const signature = await generateMailgunSignature(timestamp, token, TEST_KEY);
+
     const params = new URLSearchParams();
     params.append("subject", "Hello");
     params.append("body-plain", 'Just saying hi');
-    
+
     const req = new Request("http://localhost", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Mailgun-Signature": signature,
+        "Mailgun-Timestamp": timestamp,
+        "Mailgun-Token": token
+      },
       body: params.toString()
     });
 
-    const mockEnv = {} as any;
+    const mockEnv = {
+      MAILGUN_API_KEY: { get: async () => TEST_KEY }
+    } as any;
     const res = await worker.fetch(req, mockEnv);
     expect(res.status).toBe(400);
   });

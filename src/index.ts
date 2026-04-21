@@ -12,6 +12,7 @@ interface Env {
   EMAIL_USER_BINDING?: SecretBinding;
   EMAIL_PASS_BINDING?: SecretBinding;
   INTERNAL_KEY_BINDING?: SecretBinding;
+  MAILGUN_API_KEY?: SecretBinding;
   EMAIL_SCAN_SUBJECT?: string;
   USE_IMAP?: string;
 }
@@ -53,6 +54,39 @@ export default {
 };
 
 async function handleMailgunWebhook(request: Request, env: Env): Promise<Response> {
+  const signature = request.headers.get("Mailgun-Signature");
+  const timestamp = request.headers.get("Mailgun-Timestamp");
+  const token = request.headers.get("Mailgun-Token");
+
+  if (!signature || !timestamp || !token) {
+    return new Response("Missing Mailgun signature headers", { status: 401 });
+  }
+
+  const apiKey = await env.MAILGUN_API_KEY?.get();
+  if (!apiKey) {
+    console.error("MAILGUN_API_KEY not configured");
+    return new Response("Service configuration error", { status: 500 });
+  }
+
+  const dataToSign = timestamp + token;
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(apiKey),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signatureBytes = await crypto.subtle.sign("HMAC", key, encoder.encode(dataToSign));
+  const expectedSignature = Array.from(new Uint8Array(signatureBytes))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  if (signature !== expectedSignature) {
+    console.warn("Invalid Mailgun signature");
+    return new Response("Invalid signature", { status: 401 });
+  }
+
   try {
     const formData = await request.formData();
     const subject = formData.get("subject")?.toString() || "";
