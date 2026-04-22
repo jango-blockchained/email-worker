@@ -1,7 +1,6 @@
 {
   "name": "email-worker",
   "account_id": "debc6545e63bea36be059cbc82d80ec8",
-  "account_id": "debc6545e63bea36be059cbc82d80ec8",
   "main": "src/index.ts",
   "compatibility_date": "2025-04-18",
   "compatibility_flags": ["nodejs_compat"],
@@ -21,11 +20,5 @@
   ],
   "triggers": {
     "crons": ["*/5 * * * *"],
-  },
-  "secrets_store_secrets": [
-    {
-      "name": "MAILGUN_API_KEY",
-      "type": "secret"
-    }
-  ]
+  }
 }
