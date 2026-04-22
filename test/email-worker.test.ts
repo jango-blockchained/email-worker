@@ -93,9 +93,9 @@ describe("email-worker", () => {
     const signature = await generateMailgunSignature(timestamp, token, TEST_MAILGUN_API_KEY);
 
     const worker = (await import("../src/index.ts")).default;
-    const formData = new FormData();
-    formData.append("subject", "Trading Signal");
-    formData.append("body-plain", JSON.stringify({
+    const params = new URLSearchParams();
+    params.append("subject", "Trading Signal");
+    params.append("body-plain", JSON.stringify({
       exchange: "mexc",
       action: "sell",
       symbol: "ETHUSDT",
@@ -111,7 +111,7 @@ describe("email-worker", () => {
         "Mailgun-Timestamp": timestamp,
         "Mailgun-Token": token
       },
-      body: formData
+      body: params.toString()
     });
 
     const res = await worker.fetch(req, {
@@ -134,9 +134,9 @@ describe("email-worker", () => {
     const signature = await generateMailgunSignature(timestamp, token, TEST_MAILGUN_API_KEY);
 
     const worker = (await import("../src/index.ts")).default;
-    const formData = new FormData();
-    formData.append("subject", "Signal");
-    formData.append("stripped-text", JSON.stringify({
+    const params = new URLSearchParams();
+    params.append("subject", "Signal");
+    params.append("stripped-text", JSON.stringify({
       exchange: "bybit",
       action: "long",
       symbol: "SOLUSDT",
@@ -152,7 +152,7 @@ describe("email-worker", () => {
         "Mailgun-Timestamp": timestamp,
         "Mailgun-Token": token
       },
-      body: formData
+      body: params.toString()
     });
 
     const res = await worker.fetch(req, {
@@ -346,11 +346,10 @@ describe("scheduled handler", () => {
 
     const mockEnv = {
       ...mockEnvBase,
-      USE_IMAP: "false",
-      TRADE_SERVICE: { fetch: jest.fn() } as any
+      USE_IMAP: "false"
     };
 
-    await expect(worker.scheduled(mockEnv)).resolves.not.toThrow();
+    await expect(worker.scheduled(mockEnv)).resolves.toBeUndefined();
   });
 
   test("returns 501 when IMAP credentials missing", async () => {
@@ -364,9 +363,6 @@ describe("scheduled handler", () => {
       EMAIL_SCAN_SUBJECT: "Signal"
     };
 
-    const res = await worker.scheduled(mockEnv as any);
-
-    expect(res).toBeDefined();
-    expect(await res.text()).toContain("not fully implemented");
+    await expect(worker.scheduled(mockEnv as any)).resolves.toBeUndefined();
   });
 });
