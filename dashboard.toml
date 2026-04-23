@@ -11,11 +11,13 @@ priority = 10
 
 [sections.email.fields]
 use_imap = false
+scan_subject = "Trading Signal"
 poll_interval_minutes = 5
 mark_as_read = false
 
 [sections.email.descriptions]
 use_imap = "Enable active IMAP polling instead of relying solely on mail webhooks."
+scan_subject = "Email subject line to scan for trade signals."
 poll_interval_minutes = "How frequently to poll the IMAP server for new trade signals."
 mark_as_read = "Mark signals as read on the IMAP server after processing to avoid duplicate trades."
 

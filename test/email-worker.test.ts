@@ -19,6 +19,7 @@ async function generateMailgunSignature(timestamp: string, token: string, apiKey
 }
 
 const mockEnvBase = {
+  CONFIG_KV: { get: async () => null, put: async () => {}, list: async () => ({ keys: [] }) },
   EMAIL_HOST_BINDING: { get: async () => "imap.example.com" },
   EMAIL_USER_BINDING: { get: async () => "user@example.com" },
   EMAIL_PASS_BINDING: { get: async () => "password123" },

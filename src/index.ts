@@ -1,6 +1,7 @@
 // email-worker/src/index.ts - Scans email inbox and forwards signals to trade-worker
 
 import type { Fetcher } from "@cloudflare/workers-types";
+import type { KVNamespace } from "@cloudflare/workers-types";
 
 interface SecretBinding {
   get: () => Promise<string | null>;
@@ -8,6 +9,7 @@ interface SecretBinding {
 
 interface Env {
   TRADE_SERVICE: Fetcher;
+  CONFIG_KV?: KVNamespace;
   EMAIL_HOST_BINDING?: SecretBinding;
   EMAIL_USER_BINDING?: SecretBinding;
   EMAIL_PASS_BINDING?: SecretBinding;
@@ -110,13 +112,21 @@ async function handleDirectJson(request: Request, env: Env): Promise<Response> {
 
 async function handleIMAPScan(env: Env): Promise<Response> {
   try {
-    const host = await env.EMAIL_HOST_BINDING?.get();
-    const user = await env.EMAIL_USER_BINDING?.get();
-    const pass = await env.EMAIL_PASS_BINDING?.get();
-    const scanSubject = env.EMAIL_SCAN_SUBJECT || DEFAULT_SCAN_SUBJECT;
+    const [host, user, pass, scanSubject] = await Promise.all([
+      env.EMAIL_HOST_BINDING?.get(),
+      env.EMAIL_USER_BINDING?.get(),
+      env.EMAIL_PASS_BINDING?.get(),
+      env.CONFIG_KV?.get('email:scan_subject') || Promise.resolve(DEFAULT_SCAN_SUBJECT),
+    ]);
 
     if (!host || !user || !pass) {
       return new Response("Error: Missing IMAP credentials", { status: 500 });
+    }
+
+    const useImap = await env.CONFIG_KV?.get('email:use_imap');
+    if (useImap === 'false') {
+      console.log('[IMAP] IMAP polling disabled via KV config');
+      return new Response("IMAP polling disabled", { status: 200 });
     }
 
     console.log(`[IMAP] Scanning ${user}@${host} for: ${scanSubject}`);
@@ -127,7 +137,8 @@ async function handleIMAPScan(env: Env): Promise<Response> {
 }
 
 async function processEmail(subject: string, body: string, source: string, env: Env): Promise<Response> {
-  const signal = parseEmailSignal(body);
+  const signalPatterns = await loadSignalPatterns(env);
+  const signal = parseEmailSignal(body, signalPatterns);
   
   if (!signal) {
     return new Response(JSON.stringify({ success: false, error: "No valid signal in email" }), {
@@ -153,7 +164,7 @@ async function processEmail(subject: string, body: string, source: string, env: 
       return new Response(`Trade worker error: ${response.status}`, { status: 500 });
     }
 
-    const result = await response.json();
+    const result = await response.json() as { requestId?: string };
     return new Response(JSON.stringify({ success: true, requestId: result.requestId }), {
       headers: { "Content-Type": "application/json" }
     });
@@ -162,7 +173,27 @@ async function processEmail(subject: string, body: string, source: string, env: 
   }
 }
 
-function parseEmailSignal(body: string): EmailSignal | null {
+interface SignalPatterns {
+  coinPattern: RegExp;
+  actionPattern: RegExp;
+  quantityMultiplier: number;
+}
+
+async function loadSignalPatterns(env: Env): Promise<SignalPatterns> {
+  const [coinPattern, actionPattern, quantityMultiplier] = await Promise.all([
+    env.CONFIG_KV?.get('email:coin_pattern').then(v => v || "BTC|ETH|SOL"),
+    env.CONFIG_KV?.get('email:action_pattern').then(v => v || "BUY|SELL|LONG|SHORT"),
+    env.CONFIG_KV?.get('email:quantity_multiplier').then(v => v ? parseFloat(v) : 1),
+  ]);
+
+  return {
+    coinPattern: new RegExp(coinPattern, 'i'),
+    actionPattern: new RegExp(actionPattern, 'i'),
+    quantityMultiplier: quantityMultiplier ?? 1,
+  };
+}
+
+function parseEmailSignal(body: string, patterns: SignalPatterns): EmailSignal | null {
   try {
     const data = JSON.parse(body);
     if (data.exchange && data.action && data.symbol) {
@@ -170,27 +201,31 @@ function parseEmailSignal(body: string): EmailSignal | null {
         exchange: String(data.exchange).toLowerCase(),
         action: normalizeAction(String(data.action)),
         symbol: String(data.symbol).toUpperCase(),
-        quantity: Number(data.quantity) || 100,
+        quantity: (Number(data.quantity) || 100) * patterns.quantityMultiplier,
         price: data.price ? Number(data.price) : undefined,
         leverage: data.leverage ? Number(data.leverage) : undefined
       };
     }
   } catch {}
-  return extractFromPlaintext(body);
+  return extractFromPlaintext(body, patterns);
 }
 
-function extractFromPlaintext(body: string): EmailSignal | null {
+function extractFromPlaintext(body: string, patterns: SignalPatterns): EmailSignal | null {
   const lower = body.toLowerCase();
+
+  const symbolMatch = lower.match(patterns.coinPattern);
+  const actionMatch = lower.match(patterns.actionPattern);
+
   const exchange = extractField(lower, ["exchange", "binance", "mexc", "bybit"]);
-  const action = extractField(lower, ["action", "buy", "sell", "long", "short"]);
-  const symbol = extractField(lower, ["symbol", "pair"]);
+  const symbol = symbolMatch ? symbolMatch[0].toUpperCase() : extractField(lower, ["symbol", "pair"]);
+  const action = actionMatch ? normalizeAction(actionMatch[0]) : extractField(lower, ["action", "buy", "sell", "long", "short"]);
   
   if (exchange && action && symbol) {
     return {
       exchange: normalizeExchange(exchange),
       action: normalizeAction(action),
       symbol: symbol.toUpperCase().replace(/[^A-Z0-9]/g, ""),
-      quantity: 100,
+      quantity: 100 * patterns.quantityMultiplier,
     };
   }
   return null;
