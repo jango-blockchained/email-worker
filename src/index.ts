@@ -187,8 +187,8 @@ async function loadSignalPatterns(env: Env): Promise<SignalPatterns> {
   ]);
 
   return {
-    coinPattern: new RegExp(coinPattern, 'i'),
-    actionPattern: new RegExp(actionPattern, 'i'),
+    coinPattern: new RegExp(coinPattern as string, 'i'),
+    actionPattern: new RegExp(actionPattern as string, 'i'),
     quantityMultiplier: quantityMultiplier ?? 1,
   };
 }
