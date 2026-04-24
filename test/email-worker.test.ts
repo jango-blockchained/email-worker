@@ -20,11 +20,11 @@ async function generateMailgunSignature(timestamp: string, token: string, apiKey
 
 const mockEnvBase = {
   CONFIG_KV: { get: async () => null, put: async () => {}, list: async () => ({ keys: [] }), delete: async () => {}, getWithMetadata: async () => ({ value: null, metadata: null }) },
-  EMAIL_HOST_BINDING: { get: async () => "imap.example.com" },
-  EMAIL_USER_BINDING: { get: async () => "user@example.com" },
-  EMAIL_PASS_BINDING: { get: async () => "password123" },
-  INTERNAL_KEY_BINDING: { get: async () => "internal-key-123" },
-  MAILGUN_API_KEY: { get: async () => TEST_MAILGUN_API_KEY },
+  EMAIL_HOST_BINDING: "imap.example.com",
+  EMAIL_USER_BINDING: "user@example.com",
+  EMAIL_PASS_BINDING: "password123",
+  INTERNAL_KEY_BINDING: "internal-key-123",
+  MAILGUN_API_KEY: TEST_MAILGUN_API_KEY,
   EMAIL_SCAN_SUBJECT: "Trading Signal",
   USE_IMAP: "false"
 };
@@ -359,7 +359,7 @@ describe("scheduled handler", () => {
     const mockEnv = {
       USE_IMAP: "true",
       EMAIL_HOST_BINDING: { get: async () => null },
-      EMAIL_USER_BINDING: { get: async () => null },
+      EMAIL_USER_BINDING: undefined,
       EMAIL_PASS_BINDING: { get: async () => null },
       EMAIL_SCAN_SUBJECT: "Signal"
     };

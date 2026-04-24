@@ -3,8 +3,14 @@
 import type { Fetcher } from "@cloudflare/workers-types";
 import type { KVNamespace } from "@cloudflare/workers-types";
 
-interface SecretBinding {
-  get: () => Promise<string | null>;
+interface Env {
+  CONFIG_KV?: KVNamespace;
+  EMAIL_HOST_BINDING?: string;
+  EMAIL_USER_BINDING?: string;
+  EMAIL_PASS_BINDING?: string;
+  INTERNAL_KEY_BINDING?: string;
+  MAILGUN_API_KEY?: string;
+  TRADE_SERVICE?: Fetcher;
 }
 
 interface Env {
@@ -64,7 +70,7 @@ async function handleMailgunWebhook(request: Request, env: Env): Promise<Respons
     return new Response("Missing Mailgun signature headers", { status: 401 });
   }
 
-  const apiKey = await env.MAILGUN_API_KEY?.get();
+  const apiKey = env.MAILGUN_API_KEY;
   if (!apiKey) {
     console.error("MAILGUN_API_KEY not configured");
     return new Response("Service configuration error", { status: 500 });
@@ -113,9 +119,9 @@ async function handleDirectJson(request: Request, env: Env): Promise<Response> {
 async function handleIMAPScan(env: Env): Promise<Response> {
   try {
     const [host, user, pass, scanSubject] = await Promise.all([
-      env.EMAIL_HOST_BINDING?.get(),
-      env.EMAIL_USER_BINDING?.get(),
-      env.EMAIL_PASS_BINDING?.get(),
+      env.EMAIL_HOST_BINDING,
+      env.EMAIL_USER_BINDING,
+      env.EMAIL_PASS_BINDING,
       env.CONFIG_KV?.get('email:scan_subject') || Promise.resolve(DEFAULT_SCAN_SUBJECT),
     ]);
 
@@ -149,7 +155,7 @@ async function processEmail(subject: string, body: string, source: string, env: 
   console.log(`[${source}] Signal: ${JSON.stringify(signal)}`);
   
   try {
-    const internalKey = await env.INTERNAL_KEY_BINDING?.get();
+    const internalKey = env.INTERNAL_KEY_BINDING;
     const response = await env.TRADE_SERVICE.fetch("https://trade-worker.internal/webhook", {
       method: "POST",
       headers: {

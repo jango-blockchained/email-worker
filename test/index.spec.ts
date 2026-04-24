@@ -50,8 +50,8 @@ describe("Email Worker fetch handler", () => {
     });
 
     const mockEnv = {
-      INTERNAL_KEY_BINDING: { get: async () => "test-key" },
-      MAILGUN_API_KEY: { get: async () => TEST_KEY },
+      INTERNAL_KEY_BINDING: "test-key",
+      MAILGUN_API_KEY: TEST_KEY,
       TRADE_SERVICE: {
         fetch: vi.fn().mockResolvedValue({
           ok: true,
@@ -90,7 +90,7 @@ describe("Email Worker fetch handler", () => {
     });
 
     const mockEnv = {
-      MAILGUN_API_KEY: { get: async () => TEST_KEY }
+      MAILGUN_API_KEY: TEST_KEY
     } as any;
     const res = await worker.fetch(req, mockEnv);
     expect(res.status).toBe(400);
@@ -109,7 +109,7 @@ describe("Email Worker fetch handler", () => {
     });
 
     const mockEnv = {
-      INTERNAL_KEY_BINDING: { get: async () => "test-key" },
+      INTERNAL_KEY_BINDING: "test-key",
       TRADE_SERVICE: {
         fetch: vi.fn().mockResolvedValue({
           ok: true,
@@ -135,7 +135,7 @@ describe("Email Worker fetch handler", () => {
     });
 
     const mockEnv = {
-      INTERNAL_KEY_BINDING: { get: async () => "test-key" },
+      INTERNAL_KEY_BINDING: "test-key",
       TRADE_SERVICE: {
         fetch: vi.fn().mockResolvedValue({
           ok: false,
@@ -153,9 +153,9 @@ describe("Email Worker scheduled handler", () => {
   test("should handle scheduled event when USE_IMAP is true", async () => {
     const mockEnv = {
       USE_IMAP: "true",
-      EMAIL_HOST_BINDING: { get: async () => "imap.test.com" },
-      EMAIL_USER_BINDING: { get: async () => "user@test.com" },
-      EMAIL_PASS_BINDING: { get: async () => "password" },
+      EMAIL_HOST_BINDING: "imap.test.com",
+      EMAIL_USER_BINDING: "user@test.com",
+      EMAIL_PASS_BINDING: "password",
     } as any;
 
     // It currently just returns an unimplemented log/response but doesn't return anything to scheduled
