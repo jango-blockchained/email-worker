@@ -19,7 +19,7 @@ async function generateMailgunSignature(timestamp: string, token: string, apiKey
 }
 
 const mockEnvBase = {
-  CONFIG_KV: { get: async () => null, put: async () => {}, list: async () => ({ keys: [] }) },
+  CONFIG_KV: { get: async () => null, put: async () => {}, list: async () => ({ keys: [] }), delete: async () => {}, getWithMetadata: async () => ({ value: null, metadata: null }) },
   EMAIL_HOST_BINDING: { get: async () => "imap.example.com" },
   EMAIL_USER_BINDING: { get: async () => "user@example.com" },
   EMAIL_PASS_BINDING: { get: async () => "password123" },
@@ -33,7 +33,7 @@ describe("email-worker", () => {
   test("GET returns ready message", async () => {
     const worker = (await import("../src/index.ts")).default;
     const req = new Request("https://email-worker.workers.dev");
-    const res = await worker.fetch(req, { ...mockEnvBase, TRADE_SERVICE: {} as any });
+    const res = await worker.fetch(req as any, { ...mockEnvBase, TRADE_SERVICE: {} as any } as any);
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("Email Worker Ready");
   });
@@ -59,11 +59,11 @@ describe("email-worker", () => {
       })
     });
 
-    const res = await worker.fetch(req, {
+    const res = await worker.fetch(req as any, {
       ...mockEnvBase,
       TRADE_SERVICE: { fetch: mockFetch } as any
-    });
-    const body = await res.json();
+    } as any);
+    const body = (await res.json()) as any;
 
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
@@ -78,10 +78,10 @@ describe("email-worker", () => {
       body: JSON.stringify({ subject: "No signal here" })
     });
 
-    const res = await worker.fetch(req, { ...mockEnvBase, TRADE_SERVICE: {} as any });
+    const res = await worker.fetch(req as any, { ...mockEnvBase, TRADE_SERVICE: {} as any } as any);
 
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toContain("No valid signal");
+    expect((await res.json() as any).error).toContain("No valid signal");
   });
 
   test("POST mailgun webhook processes form data with valid signature", async () => {
@@ -115,11 +115,11 @@ describe("email-worker", () => {
       body: params.toString()
     });
 
-    const res = await worker.fetch(req, {
+    const res = await worker.fetch(req as any, {
       ...mockEnvBase,
       TRADE_SERVICE: { fetch: mockFetch } as any
-    });
-    const body = await res.json();
+    } as any);
+    const body = (await res.json()) as any;
 
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
@@ -156,10 +156,10 @@ describe("email-worker", () => {
       body: params.toString()
     });
 
-    const res = await worker.fetch(req, {
+    const res = await worker.fetch(req as any, {
       ...mockEnvBase,
       TRADE_SERVICE: { fetch: mockFetch } as any
-    });
+    } as any);
 
     expect(res.status).toBe(200);
     expect(mockFetch).toHaveBeenCalled();
@@ -180,10 +180,10 @@ describe("email-worker", () => {
       })
     });
 
-    const res = await worker.fetch(req, {
+    const res = await worker.fetch(req as any, {
       ...mockEnvBase,
       TRADE_SERVICE: { fetch: mockFetch } as any
-    });
+    } as any);
 
     expect(res.status).toBe(500);
   });
@@ -196,7 +196,7 @@ describe("email-worker", () => {
       body: "invalid{json"
     });
 
-    const res = await worker.fetch(req, { ...mockEnvBase, TRADE_SERVICE: {} as any });
+    const res = await worker.fetch(req as any, { ...mockEnvBase, TRADE_SERVICE: {} as any } as any);
 
     expect(res.status).toBe(500);
   });
@@ -214,10 +214,10 @@ describe("email-worker", () => {
       })
     });
 
-    const res = await worker.fetch(req, {
+    const res = await worker.fetch(req as any, {
       ...mockEnvBase,
       TRADE_SERVICE: { fetch: mockFetch } as any
-    });
+    } as any);
 
     expect(res.status).toBe(500);
   });
@@ -237,13 +237,13 @@ describe("email-worker", () => {
       })
     });
 
-    const res = await worker.fetch(req, {
+    const res = await worker.fetch(req as any, {
       ...mockEnvBase,
       TRADE_SERVICE: { fetch: mockFetch } as any
-    });
+    } as any);
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as any;
     expect(body.success).toBe(true);
   });
 
@@ -262,10 +262,10 @@ describe("email-worker", () => {
       })
     });
 
-    const res = await worker.fetch(req, {
+    const res = await worker.fetch(req as any, {
       ...mockEnvBase,
       TRADE_SERVICE: { fetch: mockFetch } as any
-    });
+    } as any);
 
     expect(res.status).toBe(200);
   });
@@ -287,7 +287,7 @@ describe("Mailgun signature validation", () => {
       body: formData
     });
 
-    const res = await worker.fetch(req, { ...mockEnvBase, TRADE_SERVICE: {} as any });
+    const res = await worker.fetch(req as any, { ...mockEnvBase, TRADE_SERVICE: {} as any } as any);
     expect(res.status).toBe(401);
   });
 
@@ -309,7 +309,7 @@ describe("Mailgun signature validation", () => {
       body: formData
     });
 
-    const res = await worker.fetch(req, { ...mockEnvBase, TRADE_SERVICE: {} as any });
+    const res = await worker.fetch(req as any, { ...mockEnvBase, TRADE_SERVICE: {} as any } as any);
     expect(res.status).toBe(401);
   });
 
@@ -336,7 +336,7 @@ describe("Mailgun signature validation", () => {
     });
 
     const envWithoutKey = { ...mockEnvBase, MAILGUN_API_KEY: undefined };
-    const res = await worker.fetch(req, { ...envWithoutKey, TRADE_SERVICE: {} as any });
+    const res = await worker.fetch(req as any, { ...envWithoutKey, TRADE_SERVICE: {} as any } as any);
     expect(res.status).toBe(500);
   });
 });
@@ -350,7 +350,7 @@ describe("scheduled handler", () => {
       USE_IMAP: "false"
     };
 
-    await expect(worker.scheduled(mockEnv)).resolves.toBeUndefined();
+    await expect(worker.scheduled(mockEnv as any)).resolves.toBeUndefined();
   });
 
   test("returns 501 when IMAP credentials missing", async () => {
