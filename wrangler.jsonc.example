@@ -1,9 +1,12 @@
 {
   "name": "email-worker",
-  "account_id": "debc6545e63bea36be059cbc82d80ec8",
+  // ACCOUNT_ID: Get from Cloudflare Dashboard > Overview > Account ID
+  "account_id": "YOUR_ACCOUNT_ID",
   "main": "src/index.ts",
   "compatibility_date": "2025-03-07",
   "compatibility_flags": ["nodejs_compat"],
+
+  // OBSERVABILITY: Enable logging and sampling
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,
@@ -14,22 +17,32 @@
       "invocation_logs": true
     }
   },
+
+  // VARS: Environment variables
   "vars": {
+    // TRADE_WORKER_NAME: Service name of trade-worker
     "TRADE_WORKER_NAME": "trade-worker",
+    // USE_IMAP: Enable IMAP polling (true/false)
     "USE_IMAP": "false",
   },
+
+  // KV_NAMESPACES: Key-Value storage for config
   "kv_namespaces": [
     {
       "binding": "CONFIG_KV",
-      "id": "c5917667a21745e390ff969f32b1847d"
+      "id": "YOUR_CONFIG_KV_ID"
     }
   ],
+
+  // SERVICES: Service bindings to other workers
   "services": [
     {
       "binding": "TRADE_SERVICE",
       "service": "trade-worker",
     },
   ],
+
+  // TRIGGERS: Cron schedule for email polling
   "triggers": {
     "crons": ["*/5 * * * *"],
   }
