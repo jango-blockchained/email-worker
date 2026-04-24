@@ -10,17 +10,7 @@ interface Env {
   EMAIL_PASS_BINDING?: string;
   INTERNAL_KEY_BINDING?: string;
   MAILGUN_API_KEY?: string;
-  TRADE_SERVICE?: Fetcher;
-}
-
-interface Env {
   TRADE_SERVICE: Fetcher;
-  CONFIG_KV?: KVNamespace;
-  EMAIL_HOST_BINDING?: SecretBinding;
-  EMAIL_USER_BINDING?: SecretBinding;
-  EMAIL_PASS_BINDING?: SecretBinding;
-  INTERNAL_KEY_BINDING?: SecretBinding;
-  MAILGUN_API_KEY?: SecretBinding;
   EMAIL_SCAN_SUBJECT?: string;
   USE_IMAP?: string;
 }
