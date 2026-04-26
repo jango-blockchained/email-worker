@@ -126,7 +126,7 @@ async function handleIMAPScan(env: Env): Promise<Response> {
     }
 
     console.log(`[IMAP] Scanning ${user}@${host} for: ${scanSubject}`);
-    return new Response("IMAP not fully implemented in this version", { status: 501 });
+    throw new Error("IMAP scanning requires the 'imap' package which is not available in Cloudflare Workers. Use Mailgun webhook or direct JSON instead.");
   } catch (error) {
     return errorResponse(error);
   }
