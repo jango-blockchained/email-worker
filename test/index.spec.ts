@@ -1,7 +1,11 @@
 import { describe, expect, test, vi } from "bun:test";
 import worker from "../src/index";
 
-async function generateMailgunSignature(timestamp: string, token: string, apiKey: string): Promise<string> {
+async function generateMailgunSignature(
+  timestamp: string,
+  token: string,
+  apiKey: string
+): Promise<string> {
   const encoder = new TextEncoder();
   const dataToSign = timestamp + token;
   const key = await crypto.subtle.importKey(
@@ -11,9 +15,13 @@ async function generateMailgunSignature(timestamp: string, token: string, apiKey
     false,
     ["sign"]
   );
-  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(dataToSign));
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(dataToSign)
+  );
   return Array.from(new Uint8Array(signature))
-    .map(b => b.toString(16).padStart(2, "0"))
+    .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
 
@@ -31,11 +39,18 @@ describe("Email Worker fetch handler", () => {
     const TEST_KEY = "test-mailgun-key";
     const timestamp = "1234567890";
     const token = "abc123";
-    const signature = await generateMailgunSignature(timestamp, token, TEST_KEY);
+    const signature = await generateMailgunSignature(
+      timestamp,
+      token,
+      TEST_KEY
+    );
 
     const params = new URLSearchParams();
     params.append("subject", "Trade");
-    params.append("body-plain", '{"exchange":"mexc","action":"long","symbol":"BTC_USDT"}');
+    params.append(
+      "body-plain",
+      '{"exchange":"mexc","action":"long","symbol":"BTC_USDT"}'
+    );
 
     const req = new Request("http://localhost", {
       method: "POST",
@@ -44,9 +59,9 @@ describe("Email Worker fetch handler", () => {
         "User-Agent": "Mailgun",
         "Mailgun-Signature": signature,
         "Mailgun-Timestamp": timestamp,
-        "Mailgun-Token": token
+        "Mailgun-Token": token,
       },
-      body: params.toString()
+      body: params.toString(),
     });
 
     const mockEnv = {
@@ -55,14 +70,14 @@ describe("Email Worker fetch handler", () => {
       TRADE_SERVICE: {
         fetch: vi.fn().mockResolvedValue({
           ok: true,
-          json: async () => ({ requestId: "123" })
-        })
-      }
+          json: async () => ({ requestId: "123" }),
+        }),
+      },
     } as any;
 
     const res = await worker.fetch(req, mockEnv);
     expect(res.status).toBe(200);
-    const json = await res.json() as any;
+    const json = (await res.json()) as any;
     expect(json.success).toBe(true);
     expect(json.requestId).toBe("123");
     expect(mockEnv.TRADE_SERVICE.fetch).toHaveBeenCalled();
@@ -72,11 +87,15 @@ describe("Email Worker fetch handler", () => {
     const TEST_KEY = "test-mailgun-key";
     const timestamp = "1234567891";
     const token = "def456";
-    const signature = await generateMailgunSignature(timestamp, token, TEST_KEY);
+    const signature = await generateMailgunSignature(
+      timestamp,
+      token,
+      TEST_KEY
+    );
 
     const params = new URLSearchParams();
     params.append("subject", "Hello");
-    params.append("body-plain", 'Just saying hi');
+    params.append("body-plain", "Just saying hi");
 
     const req = new Request("http://localhost", {
       method: "POST",
@@ -84,13 +103,13 @@ describe("Email Worker fetch handler", () => {
         "Content-Type": "application/x-www-form-urlencoded",
         "Mailgun-Signature": signature,
         "Mailgun-Timestamp": timestamp,
-        "Mailgun-Token": token
+        "Mailgun-Token": token,
       },
-      body: params.toString()
+      body: params.toString(),
     });
 
     const mockEnv = {
-      MAILGUN_API_KEY: TEST_KEY
+      MAILGUN_API_KEY: TEST_KEY,
     } as any;
     const res = await worker.fetch(req, mockEnv);
     expect(res.status).toBe(400);
@@ -99,13 +118,13 @@ describe("Email Worker fetch handler", () => {
   test("should handle direct JSON POST", async () => {
     const payload = {
       subject: "Test",
-      body: '{"exchange":"binance","action":"buy","symbol":"ETH_USDT"}'
+      body: '{"exchange":"binance","action":"buy","symbol":"ETH_USDT"}',
     };
 
     const req = new Request("http://localhost", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
     const mockEnv = {
@@ -113,9 +132,9 @@ describe("Email Worker fetch handler", () => {
       TRADE_SERVICE: {
         fetch: vi.fn().mockResolvedValue({
           ok: true,
-          json: async () => ({ requestId: "456" })
-        })
-      }
+          json: async () => ({ requestId: "456" }),
+        }),
+      },
     } as any;
 
     const res = await worker.fetch(req, mockEnv);
@@ -125,13 +144,13 @@ describe("Email Worker fetch handler", () => {
   test("should handle TRADE_SERVICE error", async () => {
     const payload = {
       subject: "Test",
-      body: '{"exchange":"binance","action":"buy","symbol":"ETH_USDT"}'
+      body: '{"exchange":"binance","action":"buy","symbol":"ETH_USDT"}',
     };
 
     const req = new Request("http://localhost", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
     const mockEnv = {
@@ -139,9 +158,9 @@ describe("Email Worker fetch handler", () => {
       TRADE_SERVICE: {
         fetch: vi.fn().mockResolvedValue({
           ok: false,
-          status: 500
-        })
-      }
+          status: 500,
+        }),
+      },
     } as any;
 
     const res = await worker.fetch(req, mockEnv);
@@ -165,7 +184,7 @@ describe("Email Worker scheduled handler", () => {
 
   test("should skip IMAP scan if USE_IMAP is false", async () => {
     const mockEnv = {
-      USE_IMAP: "false"
+      USE_IMAP: "false",
     } as any;
 
     await expect(worker.scheduled(mockEnv)).resolves.toBeUndefined();
